@@ -24,6 +24,7 @@
 #include "rust-hir-type-check-implitem.h"
 #include "rust-hir-type-check-type.h"
 #include "rust-hir-type-check-expr.h"
+#include "rust-hir-type-check-item.h"
 #include "rust-tyty.h"
 
 namespace Rust {
@@ -98,6 +99,12 @@ public:
 			   std::move (fields), std::move (substitutions));
 
     context->insert_type (struct_decl.get_mappings (), type);
+  }
+
+  void visit (HIR::ModuleBodied &module) override
+  {
+    for (auto &item : module.get_items ())
+      TypeCheckItem::Resolve (item.get ());
   }
 
   void visit (HIR::StructStruct &struct_decl) override

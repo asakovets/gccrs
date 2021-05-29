@@ -974,7 +974,7 @@ protected:
 
 public:
   std::string as_string () const override;
-
+  Identifier get_name () const { return module_name; }
   Location get_locus () const { return locus; }
 
   // Invalid if name is empty, so base stripping on that.

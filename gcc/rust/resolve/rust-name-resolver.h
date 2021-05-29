@@ -93,7 +93,7 @@ private:
 class Rib
 {
 public:
-  // Rusts uses local_def_ids assigned by def_collector on the AST
+  // Rust uses local_def_ids assigned by def_collector on the AST
   // lets use NodeId instead
   Rib (CrateNum crateNum, NodeId node_id)
     : crate_num (crateNum), node_id (node_id)
