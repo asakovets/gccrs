@@ -872,6 +872,10 @@ public:
     if (tyseg->get_kind () == TyTy::TypeKind::ERROR)
       return;
 
+    // this is the case where the name resolver has already fully resolved the
+    // name, which means all the work is already done.
+    bool name_resolved_fully = offset >= expr.get_num_segments ();
+
     if (expr.get_num_segments () == 1)
       {
 	Location locus = expr.get_segments ().back ().get_locus ();
@@ -966,7 +970,7 @@ public:
       {
 	rust_assert (path_resolved_id == resolved_node_id);
       }
-    else
+    else if (!name_resolved_fully)
       {
 	resolver->insert_resolved_name (expr.get_mappings ().get_nodeid (),
 					resolved_node_id);
