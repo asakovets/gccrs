@@ -229,7 +229,7 @@ public:
       }
 
     auto resolved_candidate = candidates.at (0);
-    HIR::ImplItem *resolved_method = resolved_candidate.impl_item;
+    HIR::ImplItem *resolved_method = resolved_candidate.item.impl.impl_item;
     TyTy::BaseType *lookup_tyty = resolved_candidate.ty;
 
     if (lookup_tyty->get_kind () != TyTy::TypeKind::FNDEF)
@@ -954,11 +954,21 @@ public:
 	    return;
 	  }
 
-	auto candidate = candidates.at (0);
+	auto &candidate = candidates.at (0);
 	prev_segment = tyseg;
 	tyseg = candidate.ty;
-	resolved_node_id
-	  = candidate.impl_item->get_impl_mappings ().get_nodeid ();
+
+	if (candidate.is_impl_candidate ())
+	  {
+	    resolved_node_id
+	      = candidate.item.impl.impl_item->get_impl_mappings ()
+		  .get_nodeid ();
+	  }
+	else
+	  {
+	    resolved_node_id
+	      = candidate.item.trait.item_ref.get_mappings ().get_nodeid ();
+	  }
 
 	if (seg.has_generic_args ())
 	  {

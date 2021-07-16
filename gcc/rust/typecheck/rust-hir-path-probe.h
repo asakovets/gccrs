@@ -23,6 +23,7 @@
 #include "rust-hir-full.h"
 #include "rust-tyty.h"
 #include "rust-substitution-mapper.h"
+#include "rust-hir-type-bounds.h"
 
 namespace Rust {
 namespace Resolver {
@@ -34,12 +35,79 @@ struct PathProbeCandidate
     IMPL_CONST,
     IMPL_TYPE_ALIAS,
     IMPL_FUNC,
+
+    TRAIT_ITEM_CONST,
+    TRAIT_TYPE_ALIAS,
+    TRAIT_FUNC,
+  };
+
+  struct ImplItemCandidate
+  {
+    HIR::ImplItem *impl_item;
+    HIR::ImplBlock *parent;
+  };
+
+  struct TraitItemCandidate
+  {
+    TraitReference &trait_ref;
+    const TraitItemReference &item_ref;
   };
 
   CandidateType type;
-  HIR::ImplItem *impl_item;
   TyTy::BaseType *ty;
-  HIR::ImplBlock *parent;
+  union Candidate
+  {
+    ImplItemCandidate impl;
+    TraitItemCandidate trait;
+
+    Candidate (ImplItemCandidate impl) : impl (impl) {}
+    Candidate (TraitItemCandidate trait) : trait (trait) {}
+  } item;
+
+  PathProbeCandidate (CandidateType type, TyTy::BaseType *ty,
+		      ImplItemCandidate impl)
+    : type (type), ty (ty), item (impl)
+  {}
+
+  PathProbeCandidate (CandidateType type, TyTy::BaseType *ty,
+		      TraitItemCandidate trait)
+    : type (type), ty (ty), item (trait)
+  {}
+
+  std::string as_string () const
+  {
+    return "PathProbe candidate TODO - as_string";
+  }
+
+  bool is_impl_candidate () const
+  {
+    switch (type)
+      {
+      case IMPL_CONST:
+      case IMPL_TYPE_ALIAS:
+      case IMPL_FUNC:
+	return true;
+
+      default:
+	return false;
+      }
+    gcc_unreachable ();
+  }
+
+  bool is_trait_candidate () const
+  {
+    switch (type)
+      {
+      case TRAIT_ITEM_CONST:
+      case TRAIT_TYPE_ALIAS:
+      case TRAIT_FUNC:
+	return true;
+
+      default:
+	return false;
+      }
+    gcc_unreachable ();
+  }
 };
 
 class PathProbeType : public TypeCheckBase
@@ -48,32 +116,13 @@ class PathProbeType : public TypeCheckBase
 
 public:
   static std::vector<PathProbeCandidate>
-  Probe (TyTy::BaseType *receiver, const HIR::PathIdentSegment &segment_name)
+  Probe (const TyTy::BaseType *receiver,
+	 const HIR::PathIdentSegment &segment_name)
   {
     PathProbeType probe (receiver, segment_name);
-    probe.mappings->iterate_impl_items (
-      [&] (HirId id, HIR::ImplItem *item,
-	   HIR::ImplBlock *impl) mutable -> bool {
-	probe.process_candidate (id, item, impl);
-	return true;
-      });
-
+    probe.process_impl_items_for_candidates ();
+    probe.process_traits_for_candidates (TypeBoundsProbe::Probe (receiver));
     return probe.candidates;
-  }
-
-  void process_candidate (HirId id, HIR::ImplItem *item, HIR::ImplBlock *impl)
-  {
-    current_impl = impl;
-    HirId impl_ty_id = impl->get_type ()->get_mappings ().get_hirid ();
-    TyTy::BaseType *impl_block_ty = nullptr;
-    bool ok = context->lookup_type (impl_ty_id, &impl_block_ty);
-    rust_assert (ok);
-
-    if (!receiver->can_eq (impl_block_ty, false))
-      return;
-
-    // lets visit the impl_item
-    item->accept_vis (*this);
   }
 
   void visit (HIR::TypeAlias &alias) override
@@ -86,9 +135,11 @@ public:
 	bool ok = context->lookup_type (tyid, &ty);
 	rust_assert (ok);
 
+	PathProbeCandidate::ImplItemCandidate impl_item_candidate{&alias,
+								  current_impl};
 	PathProbeCandidate candidate{
-	  PathProbeCandidate::CandidateType::IMPL_TYPE_ALIAS, &alias, ty,
-	  current_impl};
+	  PathProbeCandidate::CandidateType::IMPL_TYPE_ALIAS, ty,
+	  impl_item_candidate};
 	candidates.push_back (std::move (candidate));
       }
   }
@@ -103,9 +154,11 @@ public:
 	bool ok = context->lookup_type (tyid, &ty);
 	rust_assert (ok);
 
+	PathProbeCandidate::ImplItemCandidate impl_item_candidate{&constant,
+								  current_impl};
 	PathProbeCandidate candidate{
-	  PathProbeCandidate::CandidateType::IMPL_CONST, &constant, ty,
-	  current_impl};
+	  PathProbeCandidate::CandidateType::IMPL_CONST, ty,
+	  impl_item_candidate};
 	candidates.push_back (std::move (candidate));
       }
   }
@@ -120,20 +173,93 @@ public:
 	bool ok = context->lookup_type (tyid, &ty);
 	rust_assert (ok);
 
+	PathProbeCandidate::ImplItemCandidate impl_item_candidate{&function,
+								  current_impl};
 	PathProbeCandidate candidate{
-	  PathProbeCandidate::CandidateType::IMPL_FUNC, &function, ty,
-	  current_impl};
+	  PathProbeCandidate::CandidateType::IMPL_FUNC, ty,
+	  impl_item_candidate};
 	candidates.push_back (std::move (candidate));
       }
   }
 
 private:
-  PathProbeType (TyTy::BaseType *receiver, const HIR::PathIdentSegment &query)
+  void process_impl_items_for_candidates ()
+  {
+    mappings->iterate_impl_items ([&] (HirId id, HIR::ImplItem *item,
+				       HIR::ImplBlock *impl) mutable -> bool {
+      process_impl_item_candidate (id, item, impl);
+      return true;
+    });
+  }
+
+  void process_impl_item_candidate (HirId id, HIR::ImplItem *item,
+				    HIR::ImplBlock *impl)
+  {
+    current_impl = impl;
+    HirId impl_ty_id = impl->get_type ()->get_mappings ().get_hirid ();
+    TyTy::BaseType *impl_block_ty = nullptr;
+    bool ok = context->lookup_type (impl_ty_id, &impl_block_ty);
+    rust_assert (ok);
+
+    if (!receiver->can_eq (impl_block_ty, false))
+      return;
+
+    // lets visit the impl_item
+    item->accept_vis (*this);
+  }
+
+  void process_traits_for_candidates (
+    std::vector<std::reference_wrapper<TraitReference>> traits)
+  {
+    for (TraitReference &trait_ref : traits)
+      {
+	const TraitItemReference &trait_item_ref
+	  = trait_ref.lookup_trait_item (search.as_string ());
+	if (trait_item_ref.is_error ())
+	  continue;
+
+	// if we found a candidate it must be an optional one with an
+	// implementation
+	if (!trait_item_ref.is_optional ())
+	  continue;
+
+	PathProbeCandidate::CandidateType candidate_type;
+	switch (trait_item_ref.get_trait_item_type ())
+	  {
+	  case TraitItemReference::TraitItemType::FN:
+	    candidate_type = PathProbeCandidate::CandidateType::TRAIT_FUNC;
+	    break;
+	  case TraitItemReference::TraitItemType::CONST:
+	    candidate_type
+	      = PathProbeCandidate::CandidateType::TRAIT_ITEM_CONST;
+	    break;
+	  case TraitItemReference::TraitItemType::TYPE:
+	    candidate_type
+	      = PathProbeCandidate::CandidateType::TRAIT_TYPE_ALIAS;
+	    break;
+
+	  case TraitItemReference::TraitItemType::ERROR:
+	    gcc_unreachable ();
+	    break;
+	  }
+
+	PathProbeCandidate::TraitItemCandidate trait_item_candidate{
+	  trait_ref, trait_item_ref};
+	PathProbeCandidate candidate{candidate_type,
+				     trait_item_ref.get_tyty (),
+				     {trait_item_candidate}};
+	candidates.push_back (std::move (candidate));
+      }
+  }
+
+private:
+  PathProbeType (const TyTy::BaseType *receiver,
+		 const HIR::PathIdentSegment &query)
     : TypeCheckBase (), receiver (receiver), search (query),
       current_impl (nullptr)
   {}
 
-  TyTy::BaseType *receiver;
+  const TyTy::BaseType *receiver;
   const HIR::PathIdentSegment &search;
   std::vector<PathProbeCandidate> candidates;
   HIR::ImplBlock *current_impl;
@@ -150,7 +276,22 @@ public:
     RichLocation r (query_locus);
     ReportMultipleCandidateError visitor (r);
     for (auto &c : candidates)
-      c.impl_item->accept_vis (visitor);
+      {
+	switch (c.type)
+	  {
+	  case PathProbeCandidate::CandidateType::IMPL_CONST:
+	  case PathProbeCandidate::CandidateType::IMPL_TYPE_ALIAS:
+	  case PathProbeCandidate::CandidateType::IMPL_FUNC:
+	    c.item.impl.impl_item->accept_vis (visitor);
+	    break;
+
+	  case PathProbeCandidate::CandidateType::TRAIT_ITEM_CONST:
+	  case PathProbeCandidate::CandidateType::TRAIT_TYPE_ALIAS:
+	  case PathProbeCandidate::CandidateType::TRAIT_FUNC:
+	    r.add_range (c.item.trait.item_ref.get_locus ());
+	    break;
+	  }
+      }
 
     rust_error_at (r, "multiple applicable items in scope for: %s",
 		   query.as_string ().c_str ());
