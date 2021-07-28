@@ -50,7 +50,8 @@ public:
 	      bool opening_question_mark = false,
 	      std::vector<LifetimeParam> for_lifetimes
 	      = std::vector<LifetimeParam> ())
-    : in_parens (in_parens), opening_question_mark (opening_question_mark),
+    : TypeParamBound (), in_parens (in_parens),
+      opening_question_mark (opening_question_mark),
       for_lifetimes (std::move (for_lifetimes)),
       type_path (std::move (type_path)), locus (locus)
   {}
@@ -58,6 +59,8 @@ public:
   std::string as_string () const override;
 
   Location get_locus () const { return locus; }
+
+  Location get_locus_slow () const override final { return get_locus (); }
 
   void accept_vis (ASTVisitor &vis) override;
 
@@ -73,7 +76,10 @@ protected:
    * than base */
   TraitBound *clone_type_param_bound_impl () const override
   {
-    return new TraitBound (*this);
+    TraitBound *c = new TraitBound (type_path, locus, in_parens,
+				    opening_question_mark, for_lifetimes);
+    c->node_id = node_id;
+    return c;
   }
 };
 
