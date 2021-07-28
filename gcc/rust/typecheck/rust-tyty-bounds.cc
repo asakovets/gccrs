@@ -55,5 +55,21 @@ TypeBoundsProbe::scan ()
     }
 }
 
+TraitReference &
+TypeCheckBase::resolve_trait_path (HIR::TypePath &path)
+{
+  return TraitResolver::Resolve (path);
+}
+
 } // namespace Resolver
+
+namespace TyTy {
+std::string
+TypeBoundPredicate::as_string () const
+{
+  return std::string ("{") + reference->as_string () + ":"
+	 + hir->get_path ().as_string () + "}";
+}
+
+} // namespace TyTy
 } // namespace Rust

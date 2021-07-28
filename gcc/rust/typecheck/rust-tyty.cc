@@ -1768,7 +1768,8 @@ BaseType *
 ParamType::clone ()
 {
   return new ParamType (get_symbol (), get_ref (), get_ty_ref (),
-			get_generic_param (), get_combined_refs ());
+			get_generic_param (), get_specified_bounds (),
+			get_combined_refs ());
 }
 
 std::string
