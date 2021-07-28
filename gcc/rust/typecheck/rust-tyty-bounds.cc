@@ -67,8 +67,7 @@ namespace TyTy {
 std::string
 TypeBoundPredicate::as_string () const
 {
-  return std::string ("{") + reference->as_string () + ":"
-	 + hir->get_path ().as_string () + "}";
+  return reference->as_string ();
 }
 
 } // namespace TyTy

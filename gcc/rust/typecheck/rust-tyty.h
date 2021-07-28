@@ -132,18 +132,17 @@ public:
 class TypeBoundPredicate
 {
 public:
-  TypeBoundPredicate (Resolver::TraitReference *reference, HIR::TraitBound *hir)
-    : reference (reference), hir (hir)
+  TypeBoundPredicate (Resolver::TraitReference *reference)
+    : reference (reference)
   {}
 
   TypeBoundPredicate (const TypeBoundPredicate &other)
-    : reference (other.reference), hir (other.hir)
+    : reference (other.reference)
   {}
 
   TypeBoundPredicate &operator= (const TypeBoundPredicate &other)
   {
     reference = other.reference;
-    hir = other.hir;
     return *this;
   }
 
@@ -151,7 +150,6 @@ public:
 
 private:
   Resolver::TraitReference *reference;
-  HIR::TraitBound *hir;
 };
 
 class TypeBoundsMappings

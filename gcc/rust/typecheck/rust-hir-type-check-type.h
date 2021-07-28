@@ -280,9 +280,9 @@ public:
 		case HIR::TypeParamBound::BoundType::TRAITBOUND: {
 		  HIR::TraitBound *b
 		    = static_cast<HIR::TraitBound *> (bound.get ());
-		  TyTy::TypeBoundPredicate predicate (&resolve_trait_path (
-							b->get_path ()),
-						      b);
+		  TyTy::TypeBoundPredicate predicate (
+		    &resolve_trait_path (b->get_path ()));
+
 		  rust_debug ("got-bound: %s", predicate.as_string ().c_str ());
 		  specified_bounds.push_back (std::move (predicate));
 		}
