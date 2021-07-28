@@ -363,17 +363,16 @@ public:
     // FIXME
     std::vector<HIR::LifetimeParam> lifetimes;
 
-    AST::TypePath ast_trait_path = bound.get_type_path ();
+    AST::TypePath &ast_trait_path = bound.get_type_path ();
     HIR::TypePath *trait_path = ASTLowerTypePath::translate (ast_trait_path);
-    HIR::TypePath copy_trait_path (*trait_path);
 
     auto crate_num = mappings->get_current_crate ();
     Analysis::NodeMapping mapping (crate_num, bound.get_node_id (),
 				   mappings->get_next_hir_id (crate_num),
 				   UNKNOWN_LOCAL_DEFID);
 
-    translated = new HIR::TraitBound (mapping, std::move (copy_trait_path),
-				      bound.get_locus (), bound.is_in_parens (),
+    translated = new HIR::TraitBound (mapping, *trait_path, bound.get_locus (),
+				      bound.is_in_parens (),
 				      bound.has_opening_question_mark ());
   }
 
