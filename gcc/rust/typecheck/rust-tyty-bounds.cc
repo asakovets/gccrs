@@ -64,6 +64,7 @@ TypeCheckBase::resolve_trait_path (HIR::TypePath &path)
 } // namespace Resolver
 
 namespace TyTy {
+
 std::string
 TypeBoundPredicate::as_string () const
 {
