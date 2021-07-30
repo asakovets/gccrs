@@ -148,6 +148,14 @@ public:
   void insert_hir_expr (CrateNum crateNum, HirId id, HIR::Expr *expr);
   HIR::Expr *lookup_hir_expr (CrateNum crateNum, HirId id);
 
+  void insert_hir_path_expr_seg (CrateNum crateNum, HirId id,
+				 HIR::PathExprSegment *expr);
+  HIR::PathExprSegment *lookup_hir_path_expr_seg (CrateNum crateNum, HirId id);
+
+  void insert_hir_generic_param (CrateNum crateNum, HirId id,
+				 HIR::GenericParam *expr);
+  HIR::GenericParam *lookup_hir_generic_param (CrateNum crateNum, HirId id);
+
   void insert_hir_type (CrateNum crateNum, HirId id, HIR::Type *type);
   HIR::Type *lookup_hir_type (CrateNum crateNum, HirId id);
 
@@ -245,6 +253,10 @@ private:
   std::map<CrateNum, std::map<HirId, HIR::TraitItem *> > hirTraitItemMappings;
   std::map<CrateNum, std::map<HirId, HIR::ExternalItem *> >
     hirExternItemMappings;
+  std::map<CrateNum, std::map<HirId, HIR::PathExprSegment *> >
+    hirPathSegMappings;
+  std::map<CrateNum, std::map<HirId, HIR::GenericParam *> >
+    hirGenericParamMappings;
 
   // location info
   std::map<CrateNum, std::map<NodeId, Location> > locations;
